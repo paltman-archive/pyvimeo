@@ -23,6 +23,7 @@
 import ConfigParser
 import os
 
+
 SystemConfigPath = '/etc/pyvimeo.cfg'
 UserConfigPath = '~/.pyvimeo'
 
@@ -77,4 +78,5 @@ config.SHARED_SECRET = config.get('Credentials', 'shared_secret')
 config.API_URL       = config.get('Urls', 'starndard_api_url', 'http://www.vimeo.com/api/rest/')
 config.UPLOAD_URL    = config.get('Urls', 'upload_url', 'http://www.vimeo.com/services/upload/')
 config.AUTH_URL      = config.get('Urls', 'auth_url', 'http://www.vimeo.com/services/auth/')
+	
 
