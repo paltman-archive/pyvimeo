@@ -16,7 +16,7 @@
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 # OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABIL-
 # ITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-# SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+# SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
@@ -30,14 +30,40 @@ UserConfigPath = '~/.pyvimeo'
 class Config(ConfigParser.SafeConfigParser):
     def __init__(self, path=None, fp=None):
         ConfigParser.SafeConfigParser.__init__(self)
-                                                      
+        
         if path:
             self.read(path)
         elif fp:
             self.readfp(fp)
         else:
             self.read([SystemConfigPath, os.path.expanduser(UserConfigPath)])
-            
+    
+    def save_option(self, path, section, option, value):
+        """
+        Write the specified Section.Option to the config file specified by path.
+        Replace any previous value.  If the path doesn't exist, create it.
+        Also add the option the the in-memory config.
+		
+		Borrowed this code from the boto project. :-)  Thanks, Mitch.
+        """
+        config = ConfigParser.SafeConfigParser()
+        config.read(path)
+        if not config.has_section(section):
+            config.add_section(section)
+        config.set(section, option, value)
+        fp = open(path, 'w')
+        config.write(fp)
+        fp.close()
+        if not self.has_section(section):
+            self.add_section(section)
+        self.set(section, option, value)
+    
+    def save_user_option(self, section, option, value):
+        self.save_option(os.path.expanduser(UserConfigPath), section, option, value)
+    
+    def save_system_option(self, section, option, value):
+        self.save_option(SystemConfigPath, section, option, value)
+    
     def get(self, section, name, default=None):
         try:
             val = ConfigParser.SafeConfigParser.get(self, section, name)
@@ -45,7 +71,7 @@ class Config(ConfigParser.SafeConfigParser):
             print str(e)
             val = default
         return val
-  
+    
     def getint(self, section, name, default=0):
         try:
             val = ConfigParser.SafeConfigParser.getint(self, section, name)
@@ -78,5 +104,5 @@ config.SHARED_SECRET = config.get('Credentials', 'shared_secret')
 config.API_URL       = config.get('Urls', 'starndard_api_url', 'http://www.vimeo.com/api/rest/')
 config.UPLOAD_URL    = config.get('Urls', 'upload_url', 'http://www.vimeo.com/services/upload/')
 config.AUTH_URL      = config.get('Urls', 'auth_url', 'http://www.vimeo.com/services/auth/')
-	
+config.AUTH_TOKEN    = config.get('User', 'auth_token', None)
 

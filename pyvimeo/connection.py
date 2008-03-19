@@ -27,136 +27,102 @@ import urllib
 
 from pyvimeo import config
 
-
 class Connection(object):
 	"""
 	Represents a connection to the Vimeo API and takes care of things like
 	signing requests, authenticating, etc.
 	
-	>>> c = Connection()
-	>>> c.authenticated
-	False
-	>>> None == c.authed_user
-	True
+	Authentication for a Vimeo app goes as follows:
+	0. Check configuration for a valid token.
+	1. Get a Frob to establish an application session
+	2. Generate an authentication URL for the user using:
+		a. the frob
+		b. permissions (read, write, delete)
+		c. api key
+	3. Once the user goes to that url and clicks accept, a call to getToken
+	   will work.
+	4. Once a valid token is received, it should be saved in the user's 
+	   configuration file.
 	"""
+	auth_token = None
+	
 	def __init__(self):
-		self.__authenticated = False
-		self.__auth_token = None
-		self.__auth_token_data = None
-		self.__authed_user = None
-		self.__frob = None
+		self.auth_token = config.AUTH_TOKEN
+		self.auth_data = None
 		
-	def __generate_sig(self, **args):
+	def __generate_sig(self, **kargs):
 		sig = ''
-		sorted_keys = args.keys()
+		sorted_keys = kargs.keys()
 		sorted_keys.sort()
 		for key in sorted_keys:
-			sig += "%s%s" % (key, sorted_keys[key])
+			sig += "%s%s" % (key, kargs[key])
 	
-		return hashlib.md5("%s%S" % (config.SHARED_SECRET, sig)).hexdigest();
+		return hashlib.md5("%s%s" % (config.SHARED_SECRET, sig)).hexdigest();
 	
-	def __generate_url(self, url_base, **args):
+	def generate_url(self, url_base, **kargs):
 		url = ''
-		args['api_key'] = config.API_KEY
-		args['format'] = 'json'
-		args['nojsancallback'] = 1
-		sig = self.__generate_sig(args)
-		
-		for key in args.keys():
-			url += "%s=%s&" % (key, urllib.urlencode(args[key]))
-		
-		return "%s?%sapi_sig=%s" %  (url_base, url, sig)
+		kargs['api_key'] = config.API_KEY
+		kargs['format'] = 'json'
+		kargs['nojsoncallback'] = 1
+		kargs['api_sig'] = self.__generate_sig(**kargs)
+		url = urllib.urlencode(kargs)
+		return "%s?%s" %  (url_base, url)
 		
 	def make_request(self, method, **kargs):
-		# TODO: From the API Sandbox, it appears that all calls use the api/rest
-		#       url.  If this is not try, then filter on the method name to 
-		#       select the appropriate base_url.
 		kargs['method'] = method
-		url = self.__generate_url(url_base=config.API_URL, kargs)
+		url = self.generate_url(url_base=config.API_URL, **kargs)
 		raw_data = urllib.urlopen(url).read()
 		return simplejson.loads(raw_data)
+		
+	def check_token(self):
+		if self.auth_token:
+			self.auth_data = self.make_request(method='vimeo.auth.checkToken', auth_token=self.auth_token)
+			return 'stat' in self.auth_data and self.auth_data['stat'] == 'ok'
+		return False
+		
+	@property
+	def authenticated(self):
+		return self.check_token()
+
+
+class Authentication(Connection):
+	def __init__(self):
+		super(Connection, self).__init__()
+		self.__frob = None
+		self.__auth_token_data = None
 		
 	def __get_frob(self):
 		if self.__frob:
 			return self.__frob
-	
+			
 		frob_data = self.make_request(method='vimeo.auth.getFrob')
 		if 'stat' in frob_data and frob_data['stat'] == 'ok':
 			self.__frob = frob_data['frob']
 			return self.__frob
-		
-		return None
-		
-	def __get_token(self):
-		if self.__auth_token:
-			return self.__auth_token
 			
-		self.__get_frob()
-		self.__auth_token_data = self.make_request(method='vimeo.auth.getToken', frob=self._frob)
+	def get_token(self):
+		"""
+		Get and save to the user configuration file, the auth token.
+		"""
+		if self.auth_token:
+			return self.auth_token
+			
+		frob = self.__get_frob()
+		self.__auth_token_data = self.make_request(method='vimeo.auth.getToken', frob=frob)
 		if 'stat' in self.__auth_token_data and self.__auth_token_data['stat'] == 'ok':
-			self.__auth_token = self.__auth_token_data['auth']['token']
-			return self.__auth_token
-		
-		return None
-		
-	def __check_token(self):
-		if self.__auth_token:
-			self.__auth_token_data = self.make_request(method='vimeo.auth.checkToken', auth_token=self.__auth_token)
-			return 'stat' in self.__auth_token_data and self.__auth_token_data['stat'] == 'ok'
-		return False
-	
-	def authenticate(self):
+			self.auth_token = self.__auth_token_data['auth']['token']
+			config.save_user_option('User', 'auth_token', self.auth_token)
+			return self.auth_token
+						
+	def get_auth_url(self, write_perm=False, delete_perm=False):
 		"""
-		Authenticates the user based on the configured api key and shared
-		secret.
-		
-		>>> c = Connection()
-		>>> c.authenticate()
-		>>> c.authenticated
-		True
-		>>> None == c.authed_user
-		False
+		Get the authenticate url for the the user to register the app with.
 		"""
-		self.__get_token()
-		if self.__check_token():
-			self.__authenticated = True
-			self.__authed_user = User(auth_token_data=self.__auth_token_data)
-			
-	@property
-	def authed_user(self):
-		return self.__authed_user
-		
-	@property
-	def authenticated(self):
-		return self.__authenticated
-		
-	def get_user(username):
-		"""
-		Get a User object via an Email Address. 
-		
-		>>> c = Connection()
-		>>> user = c.get_user(username='ted')
-		>>> user.id
-		151542
-		>>> user.username
-		ted
-		>>> user.display_name
-		Ted!
-		"""
-		pass
-		
-	def get_user_by_email(email):
-		"""
-		Get a User object with a username.
-		
-		>>> c = Connection()
-		>>> user = c.get_user_by_email(email='paltman@gmail.com')
-		>>> user.id
-		332546
-		>>> user.username
-		altman
-		>>> user.display_name
-		Patrick Altman
-		"""
-		pass
-		
+		frob = self.__get_frob()
+		perms = 'read'
+		if write_perm:
+			perms = 'write'
+		if delete_perm:
+			perms = 'delete'
+		url = self.generate_url(url_base=config.AUTH_URL, perms=perms, frob=frob)
+		return url

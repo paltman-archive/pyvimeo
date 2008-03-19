@@ -24,19 +24,22 @@
 from pyvimeo.connection import Connection
 
 class User(Connection):
-	def __init__(self, auth_user_data=None):
+	def __init__(self, authenticate_user=False):
 		super(User, self).__init__()
 		
 		self.__id           = None
 		self.__username     = None
 		self.__display_name = None
 		self.__perms        = None
-	
-		if auth_user_data:
-			self.__id           = auth_user_data['auth']['user']['id']
-			self.__username     = auth_user_data['auth']['user']['username']
-			self.__display_name = auth_user_data['auth']['user']['fullname']
-			self.__perms        = auth_user_data['auth']['perms']
+		
+		if authenticate_user:
+			if self.authenticated:
+				self.__id           = self.auth_data['auth']['user']['id']
+				self.__username     = self.auth_data['auth']['user']['username']
+				self.__display_name = self.auth_data['auth']['user']['fullname']
+				self.__perms        = self.auth_data['auth']['perms']
+			else:
+				raise Exception("Failed to Authenticate.")
 			
 	@property
 	def id(self):
