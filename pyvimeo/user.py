@@ -24,6 +24,21 @@
 from pyvimeo.connection import Connection
 
 class User(Connection):
+	"""
+	Represents a Vimeo user, either authenticated as the calling user, or
+	an unauthenticated user in the system.
+	
+	Supports the following Vimeo API methods:
+		vimeo.people.findByUserName
+		vimeo.people.findByEmail
+		vimeo.people.getInfo
+		vimeo.people.getPortraitUrl
+		vimeo.people.addContact
+		vimeo.people.removeContact
+		vimeo.people.addSubscription
+		vimeo.people.removeSubscription
+		vimeo.contacts.getList
+	"""
 	def __init__(self, authenticate_user=False):
 		super(User, self).__init__()
 		
@@ -34,12 +49,18 @@ class User(Connection):
 		
 		if authenticate_user:
 			if self.authenticated:
-				self.__id           = self.auth_data['auth']['user']['id']
-				self.__username     = self.auth_data['auth']['user']['username']
-				self.__display_name = self.auth_data['auth']['user']['fullname']
-				self.__perms        = self.auth_data['auth']['perms']
+				self.load_user(self.auth_data['auth']['user'])
+				self.__perms = self.auth_data['auth']['perms']
 			else:
 				raise Exception("Failed to Authenticate.")
+	
+	def load_user(self, user_data):
+		self.__id           = user_data['id']
+		self.__username     = user_data['username']
+		if 'fullname' in user_data:
+			self.__display_name = user_data['fullname']
+		elif 'display_name' in user_data:
+			self.__display_name = user_data['display_name']
 			
 	@property
 	def id(self):
@@ -56,4 +77,22 @@ class User(Connection):
 	@property
 	def perms(self):
 		return self.__perms
+		
+	@staticmethod
+	def find_by_username(username):
+		c = Connection()
+		data = c.make_request('vimeo.people.findByUserName', username=username)
+		if 'stat' in data and data['stat'] == 'ok':
+			u = User()
+			u.load_user(data['user'])
+			return u
+		
+	@staticmethod
+	def find_by_email(email):
+		c = Connection()
+		data = c.make_request('vimeo.people.findByEmail', find_email=email)
+		if 'stat' in data and data['stat'] == 'ok':
+			u = User()
+			u.load_user(data['user'])
+			return u
 		
