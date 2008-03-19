@@ -42,37 +42,75 @@ class User(Connection):
 	def __init__(self, authenticate_user=False):
 		super(User, self).__init__()
 		
-		self.__id           = None
-		self.__username     = None
-		self.__display_name = None
-		self.__perms        = None
+		self.__userdata = None
+		self.__perms    = None
 		
 		if authenticate_user:
 			if self.authenticated:
-				self.load_user(self.auth_data['auth']['user'])
+				self.__get_info(self.auth_data['auth']['user']['id'])
 				self.__perms = self.auth_data['auth']['perms']
 			else:
 				raise Exception("Failed to Authenticate.")
 	
-	def load_user(self, user_data):
-		self.__id           = user_data['id']
-		self.__username     = user_data['username']
-		if 'fullname' in user_data:
-			self.__display_name = user_data['fullname']
-		elif 'display_name' in user_data:
-			self.__display_name = user_data['display_name']
-			
+	def __get_info(self, user_id):
+		data = self.make_request('vimeo.people.getInfo', user_id=user_id)
+		if 'stat' in data and data['stat'] == 'ok':
+			self.__userdata = data['person']
+	
+	def load_user(self, user_id):
+		self.__get_info(user_id)			
+	
+	@property
+	def location(self):
+		return self.__userdata['location']
+	
+	@property
+	def url(self):
+		return self.__userdata['url']
+		
+	@property
+	def number_of_contacts(self):
+		return int(self.__userdata['number_of_contacts'])
+		
+	@property
+	def number_of_uploads(self):
+		return int(self.__userdata['number_of_uploads'])
+		
+	@property
+	def number_of_likes(self):
+		return int(self.__userdata['number_of_likes'])
+		
+	@property
+	def number_of_videos(self):
+		return int(self.__userdata['number_of_videos'])
+		
+	@property
+	def number_of_video_appearance(self):
+		return int(self.__userdata['number_of_videos_appears_in'])
+		
+	@property
+	def profile_url(self):
+		return self.__userdata['profileurl']
+		
+	@property
+	def videos_url(self):
+		return self.__userdata['videosurl']
+		
+	@property
+	def is_staff(self):
+		return self.__userdata['is_staff'] == '1'
+		
 	@property
 	def id(self):
-		return self.__id
+		return self.__userdata['id']
 		
 	@property
 	def username(self):
-		return self.__username
+		return self.__userdata['username']
 		
 	@property
 	def display_name(self):
-		return self.__display_name
+		return self.__userdata['display_name']
 		
 	@property
 	def perms(self):
@@ -84,7 +122,7 @@ class User(Connection):
 		data = c.make_request('vimeo.people.findByUserName', username=username)
 		if 'stat' in data and data['stat'] == 'ok':
 			u = User()
-			u.load_user(data['user'])
+			u.load_user(data['user']['id'])
 			return u
 		
 	@staticmethod
@@ -93,6 +131,6 @@ class User(Connection):
 		data = c.make_request('vimeo.people.findByEmail', find_email=email)
 		if 'stat' in data and data['stat'] == 'ok':
 			u = User()
-			u.load_user(data['user'])
+			u.load_user(data['user']['id'])
 			return u
 		
