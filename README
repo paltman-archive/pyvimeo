@@ -1,3 +1,4 @@
+====================================README====================================
 Configuration is handled in either a system wide configuration file placed at:
 
 	/etc/pyvimeo.cfg
